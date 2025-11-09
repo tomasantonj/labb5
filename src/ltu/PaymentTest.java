@@ -6,11 +6,6 @@ import org.junit.Test;
 
 public class PaymentTest
 {
-
-
-
-
-
     // [201] The student must be studying at least half time to receive any subsidiary.
     @Test
     public void testNoSubsidiaryIfLessThanHalfTime() throws Exception {
@@ -20,8 +15,6 @@ public class PaymentTest
         // Only subsidiary, no loan, so should be 0
         assertEquals(0, amount);
     }
-
-
     // [202] A student studying less than full time is entitled to 50% subsidiary.
     @Test
     public void testHalfSubsidiaryIfHalfTime() throws Exception {
@@ -41,7 +34,6 @@ public class PaymentTest
         assertEquals(1396, amount);
     }
 
-
     // [203] A student studying full time is entitled to 100% subsidiary.
     @Test
     public void testFullSubsidiaryIfFullTime() throws Exception {
@@ -51,7 +43,6 @@ public class PaymentTest
         // Should be full subsidiary (2816 SEK from PaymentImpl)
         assertEquals(2816, amount);
     }
-
 
     // [506] Student loans and subsidiary is paid on the last weekday (Monday to Friday) every month.
     @Test
