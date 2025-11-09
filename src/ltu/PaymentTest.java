@@ -21,8 +21,8 @@ public class PaymentTest
         IPayment payment = new PaymentImpl(new CalendarImpl());
         // studyRate = 50 should yield half subsidiary
         int amount = payment.getMonthlyAmount("19960101-1234", 0, 50, 100);
-        // Should be half subsidiary (1396 SEK from PaymentImpl)
-        assertEquals(1396, amount);
+    // Should be half loan (3564) + half subsidiary (1396) = 4960 SEK from PaymentImpl
+    assertEquals(4960, amount);
     }
 
     @Test
@@ -30,8 +30,8 @@ public class PaymentTest
         IPayment payment = new PaymentImpl(new CalendarImpl());
         // studyRate = 75 should yield half subsidiary
         int amount = payment.getMonthlyAmount("19960101-1234", 0, 75, 100);
-        // Should be half subsidiary (1396 SEK from PaymentImpl)
-        assertEquals(1396, amount);
+    // Should be half loan (3564) + half subsidiary (1396) = 4960 SEK from PaymentImpl
+    assertEquals(4960, amount);
     }
 
     // [203] A student studying full time is entitled to 100% subsidiary.
@@ -40,8 +40,8 @@ public class PaymentTest
         IPayment payment = new PaymentImpl(new CalendarImpl());
         // studyRate = 100 should yield full subsidiary
         int amount = payment.getMonthlyAmount("19960101-1234", 0, 100, 100);
-        // Should be full subsidiary (2816 SEK from PaymentImpl)
-        assertEquals(2816, amount);
+    // Should be full loan (7088) + full subsidiary (2816) = 9904 SEK from PaymentImpl
+    assertEquals(9904, amount);
     }
 
     // [506] Student loans and subsidiary is paid on the last weekday (Monday to Friday) every month.
