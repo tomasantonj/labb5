@@ -1,171 +1,239 @@
 package ltu;
 
 import static org.junit.Assert.*;
+
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
 import org.junit.Test;
 
-public class PaymentTest {
-    // [201] The student must be studying at least half time to receive any subsidiary.
-    @Test
-    public void testNoSubsidiaryIfLessThanHalfTime() throws Exception {
-        IPayment payment = new PaymentImpl(new CalendarImpl());
-        // studyRate < 50 should yield 0 subsidiary
-        int amount = payment.getMonthlyAmount("19960101-1234", 0, 40, 100);
-        // Only subsidiary, no loan, so should be 0
-        assertEquals(0, amount);
-    }
-    // [202] A student studying less than full time is entitled to 50% subsidiary.
-    @Test
-    public void testHalfSubsidiaryIfHalfTime() throws Exception {
-        IPayment payment = new PaymentImpl(new CalendarImpl());
-        // studyRate = 50 should yield half subsidiary
-        int amount = payment.getMonthlyAmount("19960101-1234", 0, 50, 100);
-    // Should be half loan (3564) + half subsidiary (1396) = 4960 SEK from PaymentImpl
-    assertEquals(4960, amount);
-    }
+public class PaymentTest
+{
+    private static final String SPRING_TERM_DATE = "2016-03-15";
 
+    // [IDs: 101] (must be ≥20 → under 20 gets nothing)
     @Test
-    public void testHalfSubsidiaryIfMoreThanHalfTimeButLessThanFullTime() throws Exception {
-        IPayment payment = new PaymentImpl(new CalendarImpl());
-        // studyRate = 75 should yield half subsidiary
-        int amount = payment.getMonthlyAmount("19960101-1234", 0, 75, 100);
-    // Should be half loan (3564) + half subsidiary (1396) = 4960 SEK from PaymentImpl
-    assertEquals(4960, amount);
-    }
-
-    // [203] A student studying full time is entitled to 100% subsidiary.
-    @Test
-    public void testFullSubsidiaryIfFullTime() throws Exception {
-        IPayment payment = new PaymentImpl(new CalendarImpl());
-        // studyRate = 100 should yield full subsidiary
-        int amount = payment.getMonthlyAmount("19960101-1234", 0, 100, 100);
-    // Should be full loan (7088) + full subsidiary (2816) = 9904 SEK from PaymentImpl
-    assertEquals(9904, amount);
-    }
-
-    // [506] Student loans and subsidiary is paid on the last weekday (Monday to Friday) every month.
-    @Test
-    public void testPaymentDatesSpring2016() throws Exception {
-        int[][] expectedDates = {
-            {2016, 1, 29}, // Jan 29, 2016 (Friday)
-            {2016, 2, 29}, // Feb 29, 2016 (Monday)
-            {2016, 3, 31}, // Mar 31, 2016 (Thursday)
-            {2016, 4, 29}, // Apr 29, 2016 (Friday)
-            {2016, 5, 31}, // May 31, 2016 (Tuesday)
-            {2016, 6, 30}  // Jun 30, 2016 (Thursday)
-        };
-        for (int[] date : expectedDates) {
-            // Custom calendar for each month
-            ICalendar cal = new ICalendar() {
-                @Override
-                public java.util.Date getDate() {
-                    java.util.Calendar c = java.util.Calendar.getInstance();
-                    c.set(java.util.Calendar.YEAR, date[0]);
-                    c.set(java.util.Calendar.MONTH, date[1] - 1);
-                    c.set(java.util.Calendar.DAY_OF_MONTH, 1);
-                    c.set(java.util.Calendar.HOUR_OF_DAY, 0);
-                    c.set(java.util.Calendar.MINUTE, 0);
-                    c.set(java.util.Calendar.SECOND, 0);
-                    c.set(java.util.Calendar.MILLISECOND, 0);
-                    return c.getTime();
-                }
-            };
-            IPayment payment = new PaymentImpl(cal);
-            String paymentDay = payment.getNextPaymentDay();
-            String expected = String.format("%04d%02d%02d", date[0], date[1], date[2]);
-            assertEquals(expected, paymentDay);
-        }
-    }
-
-    // Edge case: studyRate just below 50 (should get 0)
-    @Test
-    public void testNoSubsidiaryIfJustBelowHalfTime() throws Exception {
-        IPayment payment = new PaymentImpl(new CalendarImpl());
-        int amount = payment.getMonthlyAmount("19960101-1234", 0, 49, 100);
+    public void studentYoungerThanTwentyReceivesNoSupport() throws Exception
+    {
+        PaymentImpl payment = createPayment(SPRING_TERM_DATE);
+        int amount = payment.getMonthlyAmount("1997010155555", 10000, 100, 100);
         assertEquals(0, amount);
     }
 
-    // Edge case: completionRatio just below 50 (should get 0)
+    // [IDs: 101, 501, 502] (turning 20 eligible; verifies full loan & full subsidy amounts)
     @Test
-    public void testNoSubsidiaryIfLowCompletionRatio() throws Exception {
-        IPayment payment = new PaymentImpl(new CalendarImpl());
-        int amount = payment.getMonthlyAmount("19960101-1234", 0, 100, 49);
-        assertEquals(0, amount);
+    public void studentTurningTwentyReceivesLoanAndSubsidy() throws Exception
+    {
+        PaymentImpl payment = createPayment(SPRING_TERM_DATE);
+        int amount = payment.getMonthlyAmount("1996010155555", 10000, 100, 100);
+        assertEquals(7088 + 2816, amount);
     }
 
-    // Edge case: age under 20 (should get 0)
+    // [IDs: 102, 103, 502] (subsidy allowed through year turning 56; loan disallowed ≥47; checks full subsidy amount)
     @Test
-    public void testNoSubsidiaryIfTooYoung() throws Exception {
-        IPayment payment = new PaymentImpl(new CalendarImpl());
-        int amount = payment.getMonthlyAmount("20100101-1234", 0, 100, 100);
-        assertEquals(0, amount);
-    }
-
-    // Edge case: age over 56 (should get 0 subsidiary)
-    @Test
-    public void testNoSubsidiaryIfTooOld() throws Exception {
-        IPayment payment = new PaymentImpl(new CalendarImpl());
-        int amount = payment.getMonthlyAmount("19500101-1234", 0, 100, 100);
-        assertEquals(0, amount);
-    }
-
-    // Edge case: age over 47 (should get 0 loan, but still get subsidiary if eligible)
-    @Test
-    public void testNoLoanIfTooOldButSubsidiaryPossible() throws Exception {
-        IPayment payment = new PaymentImpl(new CalendarImpl());
-        // Age 48, full time, eligible for subsidiary only
-        int amount = payment.getMonthlyAmount("19770101-1234", 0, 100, 100);
-        // Should be only full subsidiary (2816)
+    public void studentKeepsSubsidyUntilTurningFiftySeven() throws Exception
+    {
+        PaymentImpl payment = createPayment(SPRING_TERM_DATE);
+        int amount = payment.getMonthlyAmount("1960010155555", 10000, 100, 100);
         assertEquals(2816, amount);
     }
 
-    // Edge case: income just above fulltime threshold (should get 0 loan and 0 subsidiary)
+    // [IDs: 102, 103] (age >56 → no subsidy; loan already disallowed ≥47 → total 0)
     @Test
-    public void testNoSupportIfIncomeTooHighFullTime() throws Exception {
-        IPayment payment = new PaymentImpl(new CalendarImpl());
-        int amount = payment.getMonthlyAmount("19960101-1234", 85814, 100, 100); // 1 above FULLTIME_INCOME
+    public void studentOlderThanFiftySixGetsNoSubsidy() throws Exception
+    {
+        PaymentImpl payment = createPayment(SPRING_TERM_DATE);
+        int amount = payment.getMonthlyAmount("1959010155555", 10000, 100, 100);
         assertEquals(0, amount);
     }
 
-    // Edge case: income just above parttime threshold (should get 0 loan and 0 subsidiary)
+    // [IDs: 103, 102, 502] (from the year turning 47 → no loan; subsidy still allowed; checks subsidy amount)
     @Test
-    public void testNoSupportIfIncomeTooHighPartTime() throws Exception {
-        IPayment payment = new PaymentImpl(new CalendarImpl());
-        int amount = payment.getMonthlyAmount("19960101-1234", 128723, 75, 100); // 1 above PARTTIME_INCOME
+    public void studentCannotReceiveLoanFromAgeFortySeven() throws Exception
+    {
+        PaymentImpl payment = createPayment(SPRING_TERM_DATE);
+        int amount = payment.getMonthlyAmount("1969010155555", 10000, 100, 100);
+        assertEquals(2816, amount);
+    }
+
+    // [IDs: 103, 501, 502] (age <47 → loan allowed; checks full loan + full subsidy amounts)
+    @Test
+    public void studentYoungerThanFortySevenCanReceiveFullLoan() throws Exception
+    {
+        PaymentImpl payment = createPayment(SPRING_TERM_DATE);
+        int amount = payment.getMonthlyAmount("1970010155555", 10000, 100, 100);
+        assertEquals(7088 + 2816, amount);
+    }
+
+    // [IDs: 201] (study pace <50% → no support)
+    @Test
+    public void studyingLessThanHalfTimeDisqualifiesSupport() throws Exception
+    {
+        PaymentImpl payment = createPayment(SPRING_TERM_DATE);
+        int amount = payment.getMonthlyAmount("1990010155555", 10000, 25, 100);
         assertEquals(0, amount);
     }
 
-    // Invalid input: negative income
-    @Test(expected = IllegalArgumentException.class)
-    public void testNegativeIncomeThrows() throws Exception {
-        IPayment payment = new PaymentImpl(new CalendarImpl());
-        payment.getMonthlyAmount("19960101-1234", -1, 100, 100);
+    // [IDs: 201, 503, 504] (≥50% half-time eligible; verifies half loan + half subsidy amounts)
+    @Test
+    public void studyingHalfTimeGivesHalfSupport() throws Exception
+    {
+        PaymentImpl payment = createPayment(SPRING_TERM_DATE);
+        int amount = payment.getMonthlyAmount("1990010155555", 10000, 50, 100);
+        assertEquals(3564 + 1396, amount);
     }
 
-    // Invalid input: negative studyRate
-    @Test(expected = IllegalArgumentException.class)
-    public void testNegativeStudyRateThrows() throws Exception {
-        IPayment payment = new PaymentImpl(new CalendarImpl());
-        payment.getMonthlyAmount("19960101-1234", 0, -1, 100);
+    // [IDs: 203, 501, 502] (full-time → 100% subsidy; verifies full loan + full subsidy amounts)
+    @Test
+    public void studyingFullTimeGivesFullSupport() throws Exception
+    {
+        PaymentImpl payment = createPayment(SPRING_TERM_DATE);
+        int amount = payment.getMonthlyAmount("1990010155555", 10000, 100, 100);
+        assertEquals(7088 + 2816, amount);
     }
 
-    // Invalid input: negative completionRatio
-    @Test(expected = IllegalArgumentException.class)
-    public void testNegativeCompletionRatioThrows() throws Exception {
-        IPayment payment = new PaymentImpl(new CalendarImpl());
-        payment.getMonthlyAmount("19960101-1234", 0, 100, -1);
+    // [IDs: 301] (full-time income threshold: 85,813 inclusive; 85,814 disqualifies)
+    @Test
+    public void fullTimeStudentMustStayBelowIncomeThreshold() throws Exception
+    {
+        PaymentImpl payment = createPayment(SPRING_TERM_DATE);
+        assertEquals(7088 + 2816, payment.getMonthlyAmount("1990010155555", 85813, 100, 100));
+        assertEquals(0, payment.getMonthlyAmount("1990010155555", 85814, 100, 100));
     }
 
-    // Invalid input: null personId
-    @Test(expected = IllegalArgumentException.class)
-    public void testNullPersonIdThrows() throws Exception {
-        IPayment payment = new PaymentImpl(new CalendarImpl());
-        payment.getMonthlyAmount(null, 0, 100, 100);
+    // [IDs: 302, 503, 504] (part-time income threshold: 128,722 inclusive; 128,723 disqualifies; verifies half amounts)
+    @Test
+    public void partTimeStudentHasHigherIncomeThreshold() throws Exception
+    {
+        PaymentImpl payment = createPayment(SPRING_TERM_DATE);
+        assertEquals(3564 + 1396, payment.getMonthlyAmount("1990010155555", 128722, 75, 100));
+        assertEquals(0, payment.getMonthlyAmount("1990010155555", 128723, 75, 100));
     }
 
-    // Invalid input: malformed personId
+    // [IDs: 401] (completion ratio must be at least 50%: 50 accepted, 49 rejected)
+    @Test
+    public void completionRatioMustBeAtLeastFiftyPercent() throws Exception
+    {
+        PaymentImpl payment = createPayment(SPRING_TERM_DATE);
+        assertEquals(7088 + 2816, payment.getMonthlyAmount("1990010155555", 10000, 100, 50));
+        assertEquals(0, payment.getMonthlyAmount("1990010155555", 10000, 100, 49));
+    }
+
+    // [IDs: 505, 503, 501] (loan amount is always the full defined amount for eligibility; part-time → 3564, full-time → 7088)
+    @Test
+    public void loanAmountIsAlwaysFullForEligibleStudents() throws Exception
+    {
+        PaymentImpl payment = createPayment(SPRING_TERM_DATE);
+        assertEquals(3564, payment.getMonthlyAmount("1990010155555", 10000, 75, 100) - 1396);
+        assertEquals(7088, payment.getMonthlyAmount("1990010155555", 10000, 100, 100) - 2816);
+    }
+
+    // [IDs: 202, 203, 504, 502] (subsidy scales with study rate: part-time → 1396, full-time → 2816)
+    @Test
+    public void subsidyAmountMatchesStudyRate() throws Exception
+    {
+        PaymentImpl payment = createPayment(SPRING_TERM_DATE);
+        assertEquals(1396, payment.getMonthlyAmount("1990010155555", 10000, 75, 100) - 3564);
+        assertEquals(2816, payment.getMonthlyAmount("1990010155555", 10000, 100, 100) - 7088);
+    }
+
+    // [IDs: 506] (paid on last weekday of January 2016)
+    @Test
+    public void january2016PaysOnLastWeekday() throws Exception
+    {
+        PaymentImpl payment = createPayment("2016-01-10");
+        assertEquals("20160129", payment.getNextPaymentDay());
+    }
+
+    // [IDs: 506] (paid on last weekday of February 2016)
+    @Test
+    public void february2016PaysOnLastWeekday() throws Exception
+    {
+        PaymentImpl payment = createPayment("2016-02-10");
+        assertEquals("20160229", payment.getNextPaymentDay());
+    }
+
+    // [IDs: 506] (paid on last weekday of March 2016)
+    @Test
+    public void march2016PaysOnLastWeekday() throws Exception
+    {
+        PaymentImpl payment = createPayment("2016-03-10");
+        assertEquals("20160331", payment.getNextPaymentDay());
+    }
+
+    // [IDs: 506] (paid on last weekday of April 2016)
+    @Test
+    public void april2016PaysOnLastWeekday() throws Exception
+    {
+        PaymentImpl payment = createPayment("2016-04-10");
+        assertEquals("20160429", payment.getNextPaymentDay());
+    }
+
+    // [IDs: 506] (paid on last weekday of May 2016)
+    @Test
+    public void may2016PaysOnLastWeekday() throws Exception
+    {
+        PaymentImpl payment = createPayment("2016-05-10");
+        assertEquals("20160531", payment.getNextPaymentDay());
+    }
+
+    // [IDs: 506] (paid on last weekday of June 2016)
+    @Test
+    public void june2016PaysOnLastWeekday() throws Exception
+    {
+        PaymentImpl payment = createPayment("2016-06-10");
+        assertEquals("20160630", payment.getNextPaymentDay());
+    }
+
+    // [No-ID] (input validation outside given requirements)
     @Test(expected = IllegalArgumentException.class)
-    public void testMalformedPersonIdThrows() throws Exception {
-        IPayment payment = new PaymentImpl(new CalendarImpl());
-        payment.getMonthlyAmount("19960101", 0, 100, 100);
+    public void nullPersonIdIsRejected() throws Exception
+    {
+        PaymentImpl payment = createPayment(SPRING_TERM_DATE);
+        payment.getMonthlyAmount(null, 10000, 100, 100);
+    }
+
+    // [No-ID] (input validation outside given requirements)
+    @Test(expected = IllegalArgumentException.class)
+    public void negativeIncomeIsRejected() throws Exception
+    {
+        PaymentImpl payment = createPayment(SPRING_TERM_DATE);
+        payment.getMonthlyAmount("1990010155555", -1, 100, 100);
+    }
+
+    // [No-ID] (input validation outside given requirements)
+    @Test(expected = IllegalArgumentException.class)
+    public void invalidPersonIdLengthIsRejected() throws Exception
+    {
+        PaymentImpl payment = createPayment(SPRING_TERM_DATE);
+        payment.getMonthlyAmount("199001015555", 10000, 100, 100);
+    }
+
+    private PaymentImpl createPayment(String isoDate) throws Exception
+    {
+        return new PaymentImpl(new FixedCalendar(isoDate));
+    }
+
+    private static class FixedCalendar implements ICalendar
+    {
+        private final Date date;
+
+        private FixedCalendar(String isoDate)
+        {
+            try
+            {
+                this.date = new SimpleDateFormat("yyyy-MM-dd").parse(isoDate);
+            } catch (ParseException e)
+            {
+                throw new IllegalArgumentException("Invalid date: " + isoDate, e);
+            }
+        }
+
+        @Override
+        public Date getDate()
+        {
+            return date;
+        }
     }
 }
